@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-brand-dark: #001A5E;  /* Pancaran Dark Blue */
+  --color-brand-light: #00AEEF; /* Pancaran Light Blue */
+  --color-app-bg: #f8fafc;
+  --color-text-main: #000000;   /* Pure Black for visibility */
+  --color-text-muted: #475569;
+  --color-border-main: #cbd5e1;
+  
+  /* Redefine slate to be standard or at least logical */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+  
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-app-bg text-text-main font-sans h-screen overflow-hidden;
+  }
+}
+
+@layer components {
+  .card {
+     @apply bg-white rounded-lg shadow-[0_2px_10px_rgba(0,0,0,0.05)] p-5 border border-border-main;
+  }
+
+  .section-title {
+    @apply text-xs uppercase tracking-widest text-text-main mb-4 font-black flex justify-between items-center;
+  }
+
+  .stat-box {
+    @apply bg-white p-4 rounded-lg border border-border-main shadow-sm;
+  }
+
+  .form-group {
+    @apply mb-3;
+  }
+
+  .form-group label {
+    @apply block text-[11px] mb-1.5 text-text-main font-black uppercase tracking-wider;
+  }
+
+  .form-group input, .form-group select {
+    @apply w-full px-4 py-3 border-2 border-slate-300 rounded-xl text-sm text-text-main bg-white focus:outline-none focus:ring-4 focus:ring-brand-light/20 focus:border-brand-dark transition-all font-bold placeholder:text-slate-400;
+  }
+
+  .btn {
+    @apply px-5 py-2 rounded text-xs font-bold cursor-pointer transition-all text-center uppercase tracking-wider h-10 flex items-center justify-center;
+  }
+
+  .btn-primary {
+    @apply bg-brand-dark text-white hover:bg-brand-light transition-colors shadow-sm;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-text-main border border-border-main hover:bg-slate-50;
+  }
+
+  .tag {
+    @apply text-[10px] px-2 py-0.5 bg-brand-light/10 text-brand-light rounded font-bold uppercase;
+  }
+}
+
+

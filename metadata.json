@@ -1,0 +1,6 @@
+{
+  "name": "Pancaran Logistics Dashboard",
+  "description": "Dashboard logistik untuk Pancaran Group dengan fitur input data real-time dan manajemen armada yang dinamis menggunakan Firebase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "Shipment": {
+      "title": "Shipment",
+      "description": "Logistics shipment record for Pancaran Group",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique shipment ID" },
+        "truckPlate": { "type": "string", "description": "Truck license plate number" },
+        "driverName": { "type": "string", "description": "Name of the driver" },
+        "status": { "type": "string", "enum": ["Pending", "In Transit", "Delivered", "Cancelled"], "description": "Current status of shipment" },
+        "origin": { "type": "string", "description": "Origin location" },
+        "destination": { "type": "string", "description": "Destination location" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "type": { "type": "string", "description": "Category or type of shipment (e.g., Container, Loose Cargo)" },
+        "dynamicFields": { "type": "object", "description": "Additional user-defined fields" }
+      },
+      "required": ["truckPlate", "driverName", "status", "origin", "destination"]
+    }
+  },
+  "firestore": {
+    "/shipments/{shipmentId}": {
+      "schema": "Shipment",
+      "description": "Collection of logistics shipments"
+    }
+  }
+}
