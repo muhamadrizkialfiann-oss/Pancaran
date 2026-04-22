@@ -273,7 +273,13 @@ const LANGUAGES = {
     encrypted: "Terenkripsi",
     networkActive: "Jaringan Aktif",
     initializing: "Memulai Sistem",
-    connecting: "Menghubungkan..."
+    connecting: "Menghubungkan...",
+    authError: "Gagal masuk. Silakan periksa koneksi atau coba lagi.",
+    popupBlocked: "Popup diblokir oleh browser. Silakan izinkan popup untuk login.",
+    unauthorizedDomain: "Domain ini belum diizinkan untuk login di Firebase.",
+    enterSystem: "MASUK KE SISTEM",
+    systemReady: "Sistem Siap Digunakan",
+    accessDesc: "Klik tombol di atas untuk akses instan tanpa akun."
   },
   en: {
     dashboard: "Dashboard",
@@ -414,7 +420,13 @@ const LANGUAGES = {
     encrypted: "Encrypted",
     networkActive: "Network Active",
     initializing: "Initializing Systems",
-    connecting: "Connecting..."
+    connecting: "Connecting...",
+    authError: "Login failed. Please check your connection or try again.",
+    popupBlocked: "Popup was blocked by the browser. Please allow popups to login.",
+    unauthorizedDomain: "This domain is not authorized for login in Firebase.",
+    enterSystem: "ENTER SYSTEM",
+    systemReady: "System Ready for Access",
+    accessDesc: "Click the button above for instant access without an account."
   }
 };
 
@@ -780,7 +792,7 @@ function LogisticAnimations() {
   );
 }
 
-function LoginScreen({ onLogin, onGithubLogin, t }: { onLogin: () => void, onGithubLogin: () => void, t: any }) {
+function LoginScreen({ onEnter, t }: { onEnter: () => void, t: any }) {
   return (
     <div className="min-h-screen relative flex items-center justify-center p-6 overflow-hidden font-sans bg-[#020617] selection:bg-brand-light/30">
       {/* Background Layer with Ken Burns Effect */}
@@ -845,36 +857,28 @@ function LoginScreen({ onLogin, onGithubLogin, t }: { onLogin: () => void, onGit
             </p>
           </div>
 
-          <div className="w-full space-y-4 relative z-10">
+          <div className="w-full space-y-6 relative z-10">
             <motion.button 
-              whileHover={{ scale: 1.02, backgroundColor: "rgba(255, 255, 255, 1)" }}
+              whileHover={{ scale: 1.02, backgroundColor: "rgba(0, 174, 239, 1)" }}
               whileTap={{ scale: 0.98 }}
-              onClick={onLogin}
-              className="group relative w-full h-16 bg-white/95 rounded-2xl font-black text-[#001A5E] flex items-center justify-center gap-4 transition-all duration-500 shadow-xl overflow-hidden"
+              onClick={onEnter}
+              className="group relative w-full h-20 bg-brand-light rounded-2xl font-black text-[#001A5E] flex flex-col items-center justify-center transition-all duration-500 shadow-[0_0_40px_-5px_rgba(0,174,239,0.5)] overflow-hidden"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-brand-light/10 to-brand-dark/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="flex items-center gap-3 relative z-10">
-                <div className="p-1.5 bg-slate-100 rounded-lg shadow-inner group-hover:bg-white transition-all">
-                  <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-                </div>
-                <span className="tracking-[0.1em] text-[11px] uppercase">{t.signInGoogle}</span>
+                <ChevronRight className="group-hover:translate-x-1 transition-transform" size={24} />
+                <span className="tracking-[0.2em] text-[14px] uppercase">{t.enterSystem}</span>
               </div>
+              <span className="text-[8px] uppercase tracking-[0.2em] opacity-60 mt-1 font-bold group-hover:opacity-100 transition-opacity">
+                {t.systemReady}
+              </span>
             </motion.button>
 
-            <motion.button 
-              whileHover={{ scale: 1.02, backgroundColor: "rgba(15, 23, 42, 1)" }}
-              whileTap={{ scale: 0.98 }}
-              onClick={onGithubLogin}
-              className="group relative w-full h-16 bg-slate-900/90 rounded-2xl font-black text-white flex items-center justify-center gap-4 transition-all duration-500 shadow-xl overflow-hidden border border-white/5"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-slate-400/10 to-slate-800/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="flex items-center gap-3 relative z-10">
-                <div className="p-1.5 bg-slate-800 rounded-lg shadow-inner group-hover:bg-slate-700 transition-all">
-                  <Github size={20} className="text-white" />
-                </div>
-                <span className="tracking-[0.1em] text-[11px] uppercase">{t.signInGithub}</span>
-              </div>
-            </motion.button>
+            <div className="flex flex-col items-center gap-2">
+               <p className="text-[8px] text-white/30 uppercase tracking-[0.3em] text-center max-w-[200px] leading-relaxed">
+                  {t.accessDesc}
+               </p>
+            </div>
           </div>
 
           <div className="mt-10 flex items-center gap-4 opacity-40 hover:opacity-100 transition-opacity">
@@ -898,6 +902,8 @@ export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [googleToken, setGoogleToken] = useState<string | null>(localStorage.getItem('google_token'));
   const [githubToken, setGithubToken] = useState<string | null>(localStorage.getItem('github_token'));
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isGuest, setIsGuest] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'dashboard' | 'input' | 'manage' | 'profile' | 'compliance' | 'resource' | 'procurement' | 'performance' | 'export'>('overview');
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1046,26 +1052,42 @@ export default function App() {
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
     provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+    setAuthError(null);
     try {
       const result = await signInWithPopup(auth, provider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
       if (credential?.accessToken) {
         setGoogleToken(credential.accessToken);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed", error);
+      if (error.code === 'auth/popup-blocked') {
+        setAuthError(t.popupBlocked);
+      } else if (error.code === 'auth/unauthorized-domain') {
+        setAuthError(t.unauthorizedDomain);
+      } else {
+        setAuthError(t.authError);
+      }
     }
   };
 
   const handleGithubLogin = async () => {
+    setAuthError(null);
     try {
       const result = await signInWithPopup(auth, githubProvider);
       const credential = GithubAuthProvider.credentialFromResult(result);
       if (credential?.accessToken) {
         setGithubToken(credential.accessToken);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("GitHub Login failed", error);
+      if (error.code === 'auth/popup-blocked') {
+        setAuthError(t.popupBlocked);
+      } else if (error.code === 'auth/unauthorized-domain') {
+        setAuthError(t.unauthorizedDomain);
+      } else {
+        setAuthError(t.authError);
+      }
     }
   };
 
@@ -1073,6 +1095,12 @@ export default function App() {
     signOut(auth);
     setGoogleToken(null);
     setGithubToken(null);
+    setIsGuest(false);
+  };
+
+  const handleGuestLogin = () => {
+    setIsGuest(true);
+    setAuthError(null);
   };
 
   if (loading) {
@@ -1095,8 +1123,8 @@ export default function App() {
     );
   }
 
-  if (!user) {
-    return <LoginScreen onLogin={handleLogin} onGithubLogin={handleGithubLogin} t={t} />;
+  if (!user && !isGuest) {
+    return <LoginScreen onEnter={handleGuestLogin} t={t} />;
   }
 
   return (
@@ -1255,10 +1283,10 @@ export default function App() {
               </button>
             </div>
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-black text-black">{user.displayName}</p>
-              <p className="text-xs text-slate-700 font-medium">{user.email}</p>
+              <p className="text-sm font-black text-black">{user?.displayName || (lang === 'id' ? 'Pengguna Tamu' : 'Guest User')}</p>
+              <p className="text-xs text-slate-700 font-medium">{user?.email || 'guest@pancaran.io'}</p>
             </div>
-            <img src={user.photoURL || ''} alt="User" className="w-9 h-9 rounded-full border border-slate-800 shadow-sm" referrerPolicy="no-referrer" />
+            <img src={user?.photoURL || 'https://ui-avatars.com/api/?name=Guest&background=00AEEF&color=fff'} alt="User" className="w-9 h-9 rounded-full border border-slate-800 shadow-sm" referrerPolicy="no-referrer" />
           </div>
         </header>
 
@@ -1284,7 +1312,7 @@ export default function App() {
             {activeTab === 'procurement' && <ProcurementView key="procurement" t={t} />}
             {activeTab === 'performance' && <PerformanceView key="performance" t={t} />}
             {activeTab === 'export' && <ExportView key="export" t={t} githubToken={githubToken} />}
-            {activeTab === 'profile' && <ProfileEdit t={t} user={user} />}
+            {activeTab === 'profile' && <ProfileEdit t={t} user={user} lang={lang} />}
           </AnimatePresence>
         </div>
       </main>
@@ -3553,7 +3581,7 @@ function ManageView({ shipments, t }: { shipments: Shipment[]; t: any; key?: str
   );
 }
 
-function ProfileEdit({ t, user }: { t: any, user: any }) {
+function ProfileEdit({ t, user, lang }: { t: any, user: any, lang: string }) {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-2xl mx-auto py-8">
       <Card className="bg-white border-none shadow-2xl p-12 rounded-[2rem] relative overflow-hidden">
@@ -3567,10 +3595,10 @@ function ProfileEdit({ t, user }: { t: any, user: any }) {
             <img src={user?.photoURL || ''} alt={user?.displayName || ''} className="w-40 h-40 rounded-full border-8 border-white shadow-2xl relative z-10 transition-transform duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
           </div>
           <div className="text-center space-y-2">
-            <h1 className="text-4xl font-black text-slate-800 tracking-tight leading-tight">{user?.displayName}</h1>
+            <h1 className="text-4xl font-black text-slate-800 tracking-tight leading-tight">{user?.displayName || (lang === 'id' ? 'Pengguna Tamu' : 'Guest User')}</h1>
             <div className="flex items-center justify-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-[10px]">{user?.email}</p>
+                <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-[10px]">{user?.email || 'guest@pancaran.io'}</p>
             </div>
           </div>
         </div>
@@ -3579,7 +3607,7 @@ function ProfileEdit({ t, user }: { t: any, user: any }) {
           <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-primary/20 transition-all">
             <p className="text-[9px] font-black uppercase tracking-widest text-slate-300 mb-2 group-hover:text-primary transition-colors">Digital Identity</p>
             <div className="flex items-center justify-between">
-                <p className="text-lg font-black text-slate-800">{user?.displayName}</p>
+                <p className="text-lg font-black text-slate-800">{user?.displayName || (lang === 'id' ? 'Pengguna Tamu' : 'Guest User')}</p>
                 <div className="p-2 bg-white rounded-lg border border-slate-100 text-slate-400">
                     <UserIcon size={16} />
                 </div>
@@ -3589,7 +3617,7 @@ function ProfileEdit({ t, user }: { t: any, user: any }) {
           <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-primary/20 transition-all">
             <p className="text-[9px] font-black uppercase tracking-widest text-slate-300 mb-2 group-hover:text-primary transition-colors">Verified Channel</p>
             <div className="flex items-center justify-between">
-                <p className="text-lg font-black text-slate-800 font-mono">{user?.email}</p>
+                <p className="text-lg font-black text-slate-800 font-mono">{user?.email || 'guest@pancaran.io'}</p>
                 <div className="p-2 bg-white rounded-lg border border-slate-100 text-slate-400">
                     <CheckCircle2 size={16} />
                 </div>
