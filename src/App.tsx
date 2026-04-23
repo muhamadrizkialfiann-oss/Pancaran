@@ -1132,11 +1132,11 @@ export default function App() {
       {/* Sidebar */}
       <aside 
         className={cn(
-          "bg-white border-r border-slate-200 transition-all duration-300 flex flex-col z-50 shadow-sm",
+          "bg-white border-r border-slate-200 transition-all duration-300 flex flex-col z-50 shadow-sm h-screen sticky top-0",
           isSidebarOpen ? "w-60" : "w-20"
         )}
       >
-        <div className="p-6 border-b border-slate-200 bg-slate-50/50">
+        <div className="p-6 border-b border-slate-200 bg-slate-50/50 shrink-0">
           {isSidebarOpen ? (
             <PancaranLogo size="md" theme="light" />
           ) : (
@@ -1146,7 +1146,7 @@ export default function App() {
           )}
         </div>
 
-        <nav className="flex-1 px-3 space-y-1 mt-6">
+        <nav className="flex-1 px-3 space-y-1 mt-6 overflow-y-auto overflow-x-hidden custom-scrollbar">
           <NavItem 
             icon={<Globe size={20} />} 
             label={t.overview} 
@@ -1219,7 +1219,7 @@ export default function App() {
           />
         </nav>
 
-        <div className="p-4 space-y-2 border-t border-slate-100">
+        <div className="p-4 space-y-2 border-t border-slate-100 shrink-0">
           <div className="flex items-center gap-2 mb-2 px-3">
             <span className="text-[10px] font-black text-black uppercase tracking-widest">{t.language}</span>
           </div>
