@@ -92,6 +92,8 @@ import { Shipment } from './types';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+const TruckMap = React.lazy(() => import('./components/TruckMap').then(m => ({ default: m.TruckMap })));
+
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -143,7 +145,12 @@ const LANGUAGES = {
     fleetCenter: "Pusat komando pemantauan armada",
     lastSync: "Sinkronisasi Terakhir",
     autoSync: "Auto-Sinkron Aktif",
-    startSync: "Mulai Sinkron ke Sheet",
+    startSync: "Konfigurasikan Spreadsheet",
+    syncInfo: "Pengaturan Sinkronisasi",
+    spreadsheetId: "ID Spreadsheet Google",
+    spreadsheetLink: "Buka Spreadsheet",
+    saveConfig: "Simpan Konfigurasi",
+    syncRunning: "Sinkronisasi Berjalan...",
     totalArmada: "Total Armada",
     waiting: "Menunggu",
     inTransit: "Dalam Perjalanan",
@@ -179,7 +186,6 @@ const LANGUAGES = {
     liveUpdate: "Pembaruan Langsung",
     addField: "+ TAMBAH FIELD",
     confirmDeleteArmada: "Hapus data armada ini?",
-    syncInfo: "Info Sinkron",
     language: "Bahasa",
     profile: "Profil",
     filter: "Filter",
@@ -290,7 +296,12 @@ const LANGUAGES = {
     fleetCenter: "Fleet monitoring command center",
     lastSync: "Last Sync",
     autoSync: "Auto-Sync Active",
-    startSync: "Start Sync to Sheet",
+    startSync: "Configure Spreadsheet",
+    syncInfo: "Sync Settings",
+    spreadsheetId: "Google Spreadsheet ID",
+    spreadsheetLink: "Open Spreadsheet",
+    saveConfig: "Save Configuration",
+    syncRunning: "Sync in Progress...",
     totalArmada: "Total Fleet",
     waiting: "Pending",
     inTransit: "In Transit",
@@ -326,7 +337,6 @@ const LANGUAGES = {
     liveUpdate: "Live Update",
     addField: "+ ADD FIELD",
     confirmDeleteArmada: "Delete this fleet data?",
-    syncInfo: "Sync Info",
     language: "Language",
     profile: "Profile",
     filter: "Filter",
@@ -531,12 +541,12 @@ const MASTER_DATA_SOURCE = {
   },
   resource: {
     fleet: [
-      { id: 'B 9001 PGC', type: 'Wingbox', vendor: 'PT ABC Logistik', status: 'Ready', area: 'JKT - Marunda', route: 'Standby di Pool A', driver: 'Ahmad F.' },
-      { id: 'L 1234 XY', type: 'Tronton', vendor: 'PT Jaya Trans', status: 'In-Transit', area: 'JKT - SBY', route: 'Km 420 (Tol Cipali) | ETA: 18:00', driver: 'Budi S.' },
-      { id: 'B 5566 PAA', type: 'CDD', vendor: 'Pancaran Internal', status: 'Ready', area: 'BKS - Cibitung', route: 'Menunggu Muatan', driver: 'Siti R.' },
-      { id: 'D 8899 MTR', type: 'Fuso', vendor: 'PT Mitra Transport', status: 'In-Transit', area: 'BDG - JKT', route: 'Bongkar di Gudang B | ETA: 16:30', driver: 'Dedi C.' },
-      { id: 'B 9812 PGC', type: 'Trailer', vendor: 'Pancaran Internal', status: 'Maintenance', area: 'BKS - Bekasi', route: 'Pool C (Bengkel)', driver: '-' },
-      { id: 'L 7788 PAA', type: 'Wingbox', vendor: 'PT ABC Logistik', status: 'In-Transit', area: 'SBY - JKT', route: 'Km 150 (Tol Japek) | ETA: 22:00', driver: 'Citra D.' },
+      { id: 'B 9001 PGC', type: 'Wingbox', vendor: 'PT ABC Logistik', status: 'Ready', area: 'JKT - Marunda', route: 'Standby di Pool A', driver: 'Ahmad F.', lat: -6.1104, lng: 106.9088 },
+      { id: 'L 1234 XY', type: 'Tronton', vendor: 'PT Jaya Trans', status: 'In-Transit', area: 'JKT - SBY', route: 'Km 420 (Tol Cipali) | ETA: 18:00', driver: 'Budi S.', lat: -7.2575, lng: 112.7521 },
+      { id: 'B 5566 PAA', type: 'CDD', vendor: 'Pancaran Internal', status: 'Ready', area: 'BKS - Cibitung', route: 'Menunggu Muatan', driver: 'Siti R.', lat: -6.2692, lng: 107.0734 },
+      { id: 'D 8899 MTR', type: 'Fuso', vendor: 'PT Mitra Transport', status: 'In-Transit', area: 'BDG - JKT', route: 'Bongkar di Gudang B | ETA: 16:30', driver: 'Dedi C.', lat: -6.9175, lng: 107.6191 },
+      { id: 'B 9812 PGC', type: 'Trailer', vendor: 'Pancaran Internal', status: 'Maintenance', area: 'BKS - Bekasi', route: 'Pool C (Bengkel)', driver: '-', lat: -6.2383, lng: 106.9756 },
+      { id: 'L 7788 PAA', type: 'Wingbox', vendor: 'PT ABC Logistik', status: 'In-Transit', area: 'SBY - JKT', route: 'Km 150 (Tol Japek) | ETA: 22:00', driver: 'Citra D.', lat: -6.4025, lng: 108.2833 },
     ],
     performance: [
       { name: 'PT ABC Logistik', value: 95 },
@@ -936,7 +946,7 @@ export default function App() {
   }, [githubToken]);
 
   const handleSyncToSheets = async (isAuto = false) => {
-    if (isSyncing || !googleToken) return;
+    if (isSyncing || !googleToken || shipments.length === 0) return;
 
     setIsSyncing(true);
     if (!isAuto) setSyncStatus(null);
@@ -950,11 +960,17 @@ export default function App() {
       });
 
       const headers = Array.from(allKeys);
-      const rows = shipments.map(s => headers.map(h => (s as any)[h] || ''));
+      // Sort shipments by timestamp descending for the sheet
+      const sortedShipments = [...shipments].sort((a, b) => 
+        (b.timestamp || '').localeCompare(a.timestamp || '')
+      );
+      
+      const rows = sortedShipments.map(s => headers.map(h => (s as any)[h] || ''));
       const data = [headers, ...rows];
 
-      const spreadsheetId = '1zJW6qg9WX1d_cV5tI2sS1llEq_Tr3iea8nc4FXpIys4';
-      const range = 'Sheet2!A1';
+      // Use the spreadsheet ID provided by user or default
+      const spreadsheetId = localStorage.getItem('spreadsheet_id') || '1zJW6qg9WX1d_cV5tI2sS1llEq_Tr3iea8nc4FXpIys4';
+      const range = 'Sheet1!A1'; // Defaulting to Sheet1 for more generic use
       
       const response = await fetch(
         `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?valueInputOption=USER_ENTERED`,
@@ -969,15 +985,15 @@ export default function App() {
       );
 
       if (!response.ok) {
-        const err = await response.json();
-        const errorMessage = err.error?.message || "Failed to sync to Spreadsheet.";
+        const errData = await response.json();
         if (response.status === 401) {
           setGoogleToken(null);
+          localStorage.removeItem('google_token');
         }
-        throw new Error(errorMessage);
+        throw new Error(errData.error?.message || "Failed to sync to Spreadsheet.");
       }
 
-      if (!isAuto) setSyncStatus({ type: 'success', message: lang === 'id' ? 'Data berhasil disinkronkan!' : 'Data synced successfully!' });
+      if (!isAuto) setSyncStatus({ type: 'success', message: lang === 'id' ? 'Data berhasil disinkronkan ke Spreadsheet!' : 'Data synced successfully to Spreadsheet!' });
     } catch (err: any) {
       console.error(err);
       if (!isAuto) setSyncStatus({ type: 'error', message: err.message });
@@ -1305,7 +1321,17 @@ export default function App() {
                 handleSyncManual={() => googleToken ? handleSyncToSheets(false) : loginGoogleForSheets()}
               />
             )}
-            {activeTab === 'input' && <InputView key="input" t={t} lang={lang} onSuccess={() => setActiveTab('dashboard')} />}
+            {activeTab === 'input' && (
+              <InputView 
+                key="input" 
+                t={t} 
+                lang={lang} 
+                onSuccess={() => {
+                  setActiveTab('dashboard');
+                  if (autoSyncEnabled && googleToken) handleSyncToSheets(true);
+                }} 
+              />
+            )}
             {activeTab === 'manage' && <ManageView key="manage" t={t} shipments={shipments} />}
             {activeTab === 'compliance' && <ComplianceView key="compliance" t={t} />}
             {activeTab === 'resource' && <ResourceView key="resource" t={t} />}
@@ -1456,17 +1482,30 @@ function OverviewView({ t }: { t: any; key?: string }) {
              <Globe size={18} className="text-emerald-400" />
              <h2 className="text-xs font-black uppercase tracking-[0.2em]">{t.mapIndonesia}</h2>
           </div>
-          <div className="h-[300px] w-full flex items-center justify-center relative">
-             <div className="absolute inset-0 opacity-40 grayscale group-hover:grayscale-0 transition-all duration-700">
-                <Map size={400} className="text-emerald-500/20 mx-auto" />
+          <div className="h-[300px] w-full relative">
+             <div className="absolute inset-0 z-0">
+               <React.Suspense fallback={<div className="w-full h-full bg-slate-800 animate-pulse flex items-center justify-center rounded-2xl"><p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Memuat Peta...</p></div>}>
+                 <TruckMap 
+                   darkMode={true} 
+                   zoom={5} 
+                   locations={MASTER_DATA_SOURCE.resource.fleet.map(f => ({
+                     id: f.id,
+                     lat: f.lat,
+                     lng: f.lng,
+                     label: f.route,
+                     status: f.status,
+                     type: f.type
+                   }))} 
+                 />
+               </React.Suspense>
              </div>
              {/* Hub Labels Overlay */}
-             <div className="absolute right-4 top-1/2 -translate-y-1/2 space-y-4">
+             <div className="absolute right-4 top-1/2 -translate-y-1/2 space-y-4 z-20 pointer-events-none">
                 {['JAKARTA HUB', 'SURABAYA HUB', 'MEDAN HUB'].map((hub, i) => (
                   <div key={hub} className="bg-[#0f172a]/80 p-3 rounded-xl border border-slate-700 backdrop-blur-md">
                     <div className="flex items-center gap-2 mb-1">
                       <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      <p className="text-[9px] font-black tracking-widest">{hub}</p>
+                      <p className="text-[9px] font-black tracking-widest text-white">{hub}</p>
                     </div>
                     <div className="flex gap-4">
                        <div className="h-1 w-12 bg-slate-700 rounded-full overflow-hidden">
@@ -1476,9 +1515,6 @@ function OverviewView({ t }: { t: any; key?: string }) {
                   </div>
                 ))}
              </div>
-             {/* Map Markers */}
-             <motion.div animate={{ scale: [1, 1.2, 1], opacity: [1, 0.5, 1] }} transition={{ repeat: Infinity, duration: 2 }} className="absolute left-[45%] top-[60%] text-emerald-400 drop-shadow-[0_0_10px_#10b981]"><Truck size={24} /></motion.div>
-             <motion.div animate={{ scale: [1, 1.2, 1], opacity: [1, 0.5, 1] }} transition={{ repeat: Infinity, duration: 2, delay: 0.5 }} className="absolute left-[55%] top-[65%] text-emerald-400 drop-shadow-[0_0_10px_#10b981]"><Truck size={18} /></motion.div>
           </div>
         </div>
 
@@ -1606,6 +1642,14 @@ function DashboardView({
   handleSyncManual: () => void;
   key?: string 
 }) {
+  const [sheetId, setSheetId] = useState(localStorage.getItem('spreadsheet_id') || '1zJW6qg9WX1d_cV5tI2sS1llEq_Tr3iea8nc4FXpIys4');
+  const [showConfig, setShowConfig] = useState(false);
+
+  const saveSheetConfig = () => {
+    localStorage.setItem('spreadsheet_id', sheetId);
+    setShowConfig(false);
+  };
+
   const stats = {
     total: shipments.length,
     pending: shipments.filter(s => s.status === 'Pending').length,
@@ -1633,16 +1677,23 @@ function DashboardView({
         </div>
         <div className="flex items-center gap-3">
           <button 
+            onClick={() => setShowConfig(!showConfig)}
+            className="p-2.5 bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
+            title={t.syncInfo}
+          >
+            <Settings size={18} />
+          </button>
+          <button 
             onClick={handleSyncManual}
             disabled={isSyncing}
             className={cn(
               "btn flex items-center gap-2",
-              autoSyncEnabled ? "bg-green-100 text-green-700 border border-green-200" : "bg-green-500 text-white hover:bg-green-600 shadow-sm"
+              autoSyncEnabled ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
             )}
           >
             {isSyncing ? <RefreshCw size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
-            <span className="text-[10px] uppercase tracking-widest font-bold">
-              {autoSyncEnabled ? `${t.autoSync} (Live)` : t.startSync}
+            <span className="text-[10px] uppercase tracking-widest font-black">
+              {isSyncing ? t.syncRunning : (autoSyncEnabled ? `${t.autoSync} (Live)` : t.startSync)}
             </span>
           </button>
           <div className="flex items-center gap-2 text-[10px] text-black bg-white px-4 py-2 rounded-lg border border-slate-200 uppercase tracking-widest font-black shadow-sm">
@@ -1651,6 +1702,50 @@ function DashboardView({
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {showConfig && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-white border border-blue-100 p-6 rounded-xl shadow-lg ring-1 ring-blue-900/5"
+          >
+            <div className="flex flex-col sm:flex-row gap-4 items-end">
+              <div className="flex-1 space-y-2">
+                <label className="text-[9px] font-black uppercase tracking-widest text-blue-900 ml-1 block">{t.spreadsheetId}</label>
+                <input 
+                  value={sheetId}
+                  onChange={e => setSheetId(e.target.value)}
+                  className="modern-input h-10 text-[11px] font-mono"
+                  placeholder="Paste your Spreadsheet ID here"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={saveSheetConfig}
+                  className="h-10 px-6 bg-blue-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2"
+                >
+                  <Save size={14} />
+                  {t.saveConfig}
+                </button>
+                <a 
+                  href={`https://docs.google.com/spreadsheets/d/${sheetId}`} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="h-10 px-6 bg-white border border-slate-200 text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
+                >
+                  <Globe size={14} />
+                  {t.spreadsheetLink}
+                </a>
+              </div>
+            </div>
+            <p className="mt-4 text-[9px] text-slate-400 leading-relaxed italic">
+              * Pastikan Anda telah masuk dengan Google dan memberikan akses Spreadsheet. Jika sinkronisasi otomatis aktif, data akan diperbarui setiap ada perubahan baru.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {syncStatus && (
         <motion.div 
@@ -1796,6 +1891,7 @@ function InputView({ onSuccess, t, lang }: { onSuccess: () => void; t: any; lang
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     try {
       const docData: any = {
@@ -1932,17 +2028,17 @@ function InputView({ onSuccess, t, lang }: { onSuccess: () => void; t: any; lang
             </div>
 
             <div className="pt-10 border-t border-slate-100 space-y-8">
-              {/* Add New Field Tool - Positioned below Container/Status and above Field Names */}
-              <div className="bg-slate-50 border-2 border-dashed border-slate-200 p-8 rounded-2xl group focus-within:border-blue-400 transition-all shadow-sm">
+              {/* Add New Field Tool - Active Style */}
+              <div className="bg-blue-50/30 border-2 border-dashed border-blue-200 p-8 rounded-2xl group focus-within:border-blue-400 transition-all shadow-sm">
                 <div className="flex gap-4 items-end">
                   <div className="flex-1 space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-800 ml-1 block">{t.fieldName}</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-blue-900 ml-1 block">{t.fieldName}</label>
                     <input 
                       value={newFieldName} 
                       onChange={e => setNewFieldName(e.target.value)} 
                       placeholder={t.fieldPlaceholder} 
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddPersistentField())} 
-                      className="modern-input h-11 bg-white border-slate-200 focus:ring-4 focus:ring-blue-500/10" 
+                      className="modern-input h-11 bg-white border-blue-100 focus:ring-4 focus:ring-blue-500/10 placeholder:text-blue-200" 
                       disabled={addingField}
                     />
                   </div>
@@ -1950,7 +2046,7 @@ function InputView({ onSuccess, t, lang }: { onSuccess: () => void; t: any; lang
                     type="button" 
                     onClick={handleAddPersistentField} 
                     disabled={addingField || !newFieldName.trim()}
-                    className="h-11 px-8 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-600/10 font-black text-[10px] uppercase tracking-widest disabled:opacity-50"
+                    className="h-11 px-8 bg-blue-600 text-white rounded-xl hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 shadow-lg shadow-blue-600/20 font-black text-[10px] uppercase tracking-widest disabled:opacity-50"
                   >
                     {addingField ? <RefreshCw className="animate-spin" size={16} /> : <Plus size={18} />}
                     {t.addColumn}
@@ -2884,21 +2980,21 @@ function ResourceView({ t }: { t: any, key?: string }) {
                  <h3 className="text-[10px] font-black text-black uppercase tracking-widest">{t.mapView}</h3>
               </div>
            </div>
-           <div className="flex-1 bg-blue-50 relative min-h-[300px]">
-              {/* Mock Map Image Representation */}
-              <div className="absolute inset-0 grayscale contrast-125 opacity-20" 
-                   style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, #ccc 1px, transparent 0)', backgroundSize: '24px 24px' }} />
-              
-              <div className="absolute inset-0 p-8 flex items-center justify-center">
-                 <div className="relative w-full h-full border border-dashed border-slate-300 rounded-2xl">
-                    <div className="absolute top-[20%] left-[30%]">📍 <span className="p-0.5 bg-white border border-slate-200 rounded text-[7px] font-black">Wingbox A</span></div>
-                    <div className="absolute top-[50%] left-[60%]">📍 <span className="p-0.5 bg-white border border-slate-200 rounded text-[7px] font-black">Tronton B</span></div>
-                    <div className="absolute top-[70%] left-[40%]">📍 <span className="p-0.5 bg-white border border-slate-200 rounded text-[7px] font-black">CDD C</span></div>
-                    <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm p-4 rounded-xl border border-slate-200 text-[10px] font-black uppercase text-black italic shadow-xl">
-                       [ Map Integration Simulator ]
-                    </div>
-                 </div>
-              </div>
+           <div className="flex-1 bg-blue-50 relative min-h-[400px]">
+              <React.Suspense fallback={<div className="w-full h-full bg-slate-100 animate-pulse flex items-center justify-center rounded-2xl"><p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Loading Map Engine...</p></div>}>
+                <TruckMap 
+                  center={[-6.2088, 106.8456]} 
+                  zoom={10} 
+                  locations={resourceData.map(f => ({
+                    id: f.id,
+                    lat: f.lat,
+                    lng: f.lng,
+                    label: f.route,
+                    status: f.status,
+                    type: f.type
+                  }))} 
+                />
+              </React.Suspense>
            </div>
         </div>
 
